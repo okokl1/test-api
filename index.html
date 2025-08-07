@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>แบบฟอร์มบันทึกข้อมูล</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 500px;
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 28px;
+            font-weight: 600;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+            font-size: 16px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:active {
+            transform: translateY(-1px);
+        }
+
+        .btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .message {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+            font-weight: 500;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+        }
+
+        .message.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .required {
+            color: #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>แบบฟอร์มบันทึกข้อมูล</h1>
+        <form id="userForm">
+            <div class="form-group">
+                <label for="firstName">ชื่อ <span class="required">*</span></label>
+                <input type="text" id="firstName" name="firstName" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="lastName">นามสกุล <span class="required">*</span></label>
+                <input type="text" id="lastName" name="lastName" required>
+            </div>
+            
+            <button type="submit" class="btn" id="submitBtn">
+                บันทึกข้อมูล
+            </button>
+        </form>
+        
+        <div id="message" class="message"></div>
+    </div>
+
+    <script>
+        // ข้อมูลการเชื่อมต่อ Google Sheets
+        const API_KEY = 'AIzaSyBUKGEDJMKBG4YjeGyitrzpN9bm6_sowp4';
+        const SPREADSHEET_ID = '1ggLL4JyTxIhzcpQiMiU_Y3-LO5JGXTTB06leQ5ydVao';
+        const SHEET_NAME = 'test';
+        
+        const form = document.getElementById('userForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const messageDiv = document.getElementById('message');
+
+        // ฟังก์ชันแสดงข้อความ
+        function showMessage(text, type) {
+            messageDiv.textContent = text;
+            messageDiv.className = `message ${type} show`;
+            
+            setTimeout(() => {
+                messageDiv.classList.remove('show');
+            }, 5000);
+        }
+
+        // ฟังก์ชันแสดงสถานะ Loading
+        function setLoading(loading) {
+            if (loading) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="loading"></span>กำลังบันทึก...';
+            } else {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = 'บันทึกข้อมูล';
+            }
+        }
+
+        // ฟังก์ชันบันทึกข้อมูลไป Google Sheets
+        async function saveToGoogleSheets(firstName, lastName) {
+            try {
+                setLoading(true);
+                
+                // สร้างข้อมูลที่จะส่ง
+                const currentDate = new Date().toLocaleString('th-TH', {
+                    timeZone: 'Asia/Bangkok'
+                });
+                
+                const values = [
+                    [firstName, lastName, currentDate]
+                ];
+
+                // URL สำหรับ Google Sheets API
+                const url = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}:append?valueInputOption=USER_ENTERED&key=${API_KEY}`;
+                
+                // ส่งข้อมูลไป Google Sheets
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        values: values
+                    })
+                });
+
+                if (response.ok) {
+                    showMessage('บันทึกข้อมูลเรียบร้อยแล้ว!', 'success');
+                    form.reset(); // เคลียร์ฟอร์ม
+                } else {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error?.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showMessage(`เกิดข้อผิดพลาด: ${error.message}`, 'error');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // จัดการการส่งฟอร์ม
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const firstName = document.getElementById('firstName').value.trim();
+            const lastName = document.getElementById('lastName').value.trim();
+            
+            // ตรวจสอบข้อมูล
+            if (!firstName || !lastName) {
+                showMessage('กรุณากรอกข้อมูลให้ครบถ้วน', 'error');
+                return;
+            }
+            
+            // บันทึกข้อมูล
+            await saveToGoogleSheets(firstName, lastName);
+        });
+
+        // เพิ่มเอฟเฟ็กต์ focus สำหรับ input
+        document.querySelectorAll('input[type="text"]').forEach(input => {
+            input.addEventListener('focus', () => {
+                input.parentElement.style.transform = 'scale(1.02)';
+            });
+            
+            input.addEventListener('blur', () => {
+                input.parentElement.style.transform = 'scale(1)';
+            });
+        });
+    </script>
+</body>
+</html>
